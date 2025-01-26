@@ -1,0 +1,92 @@
+[tool.poetry]
+name = "chatroom-server"
+version = "0.1.0"
+description = "API chat room handler."
+authors = ["valed-dm <dmvaled@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "chatroom_server"}]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.lint]
+select = [
+    "F", # Flake8: Errors and undefined names
+    "E", # Flake8: Style issues
+    "W",
+    "C90",
+    "I", # Import sorting
+    "N",
+    "UP",
+    "YTT",
+    # "ANN", # flake8-annotations: we should support this in the future but 100+ errors atm
+    "ASYNC",
+    "S",
+    "BLE",
+    "FBT",
+    "B",
+    "A",
+    "COM",
+    "C4",
+    "DTZ",
+    "T10",
+    "DJ",
+    "EM",
+    "EXE",
+    "FA",
+    'ISC',
+    "ICN",
+    "G",
+    'INP',
+    'PIE',
+    "T20",
+    'PYI',
+    'PT',
+    "Q",
+    "RSE",
+    "RET",
+    "SLF",
+    "SLOT",
+    "SIM",
+    "TID",
+    "TCH",
+    "INT",
+    # "ARG", # Unused function argument
+    "PTH",
+    "ERA",
+    "PD",
+    "PGH",
+    "PL",
+    "TRY",
+    "FLY",
+    # "NPY",
+    # "AIR",
+    "PERF",
+    # "FURB",
+    # "LOG",
+    "RUF",
+]
+ignore = [
+    "S101", # Use of assert detected (intended for debugging purposes)
+    "TCH001",
+    "TCH002", # Move third-party import into a type-checking block
+    "RUF012", # Mutable class attributes allowed for specific design cases
+    "UP038", # Avoid fixing isinstance/issubclass tuples automatically
+]
+# The fixes in extend-unsafe-fixes will require
+# provide the `--unsafe-fixes` flag when fixing.
+extend-unsafe-fixes = [
+    "UP038",
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true # Easier diff tracking in version control
