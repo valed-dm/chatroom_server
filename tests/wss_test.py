@@ -7,7 +7,7 @@ import websockets
 
 async def wss_test():
     """Test wss server"""
-    uri = "wss://localhost:8765"
+    uri = "wss://localhost:8765/ws/chatrooms/test-room"
 
     # Create an SSL context that skips certificate verification
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -16,9 +16,10 @@ async def wss_test():
 
     try:
         async with websockets.connect(uri, ssl=ssl_context) as websocket:
-            await websocket.send("Hello, Server!")
+            await websocket.send("Hello, WSS Server!")
             response = await websocket.recv()
             logging.info(response)
+            await asyncio.sleep(.1)
     except Exception as e:
         exc_msg = f"An error occurred: {e}"
         logging.exception(exc_msg)
