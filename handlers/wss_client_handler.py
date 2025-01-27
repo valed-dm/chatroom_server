@@ -2,49 +2,53 @@ import asyncio
 import logging
 import re
 
-from websockets import ConnectionClosed
-from websockets.legacy.server import WebSocketServerProtocol
+from websockets import ServerConnection
+from websockets.exceptions import ConnectionClosedError
+from websockets.exceptions import ConnectionClosedOK
+
+lock = asyncio.Lock()
 
 connected_clients = set()
 
 
-async def handle_client(
-    websocket: WebSocketServerProtocol,
-    path="",
-) -> None:
-    """Handle WebSocket connections.
-    :param websocket: WebSocketServerProtocol
-    :type path: str
+async def handle_client(connection: ServerConnection) -> None:
     """
-    match = re.match(r"^/ws/chatrooms/(?P<roomId>[\w-]+)$", path)
+    Handle WebSocket connections.
+    :param connection: ServerConnection instance.
+    """
+    request = connection.request
+    path = request.path
+    logging.info(f"Request path: {path}")
 
-    # Register client
-    connected_clients.add(websocket)
-    client_info_msg = f"Client connected: {websocket.remote_address}, room ID: {match}"
-    logging.info(client_info_msg)
+    async with lock:
+        connected_clients.add(connection)
 
     try:
-        await websocket.send("Welcome to the WebSocket chatroom!")
+        if path == "/":
+            await connection.send("Welcome to the WebSocket server!")
+        else:
+            match = re.match(r"^/ws/chatrooms/(?P<roomId>[\w-]+)$", path)
+            if match:
+                room_id = match.group("roomId")
+                logging.info(f"Client joined room: {room_id}")
+                await connection.send(f"Welcome to chatroom {room_id}!")
+            else:
+                logging.warning(f"Invalid path: {path}")
+                await connection.send("Invalid path. Disconnecting.")
+                return
 
-        async for message in websocket:
-            # Broadcast message to all connected clients
-            tasks = [
-                client.send(f"Client says: {message}")
-                for client in connected_clients
-                if client != websocket
-            ]
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # Continuously listen for messages
+        async for message in connection:
+            logging.info(f"Received message: {message}")
+            try:
+                await connection.send(f"Echo: {message}")
+            except (ConnectionClosedOK, ConnectionClosedError):
+                logging.warning("Connection closed before response could be sent.")
+                break
 
-            # Log the received message
-            info_msg = f"Received message: {message}"
-            logging.info(info_msg)
-
-    except ConnectionClosed as e:
-        exc_msg = f"Connection closed: {e}"
-        logging.exception(exc_msg)
-
+    except Exception as e:
+        logging.exception(f"Error handling client: {e}")
     finally:
-        # Unregister client
-        connected_clients.remove(websocket)
-        disconnect_msg = f"Client disconnected: {websocket.remote_address}"
-        logging.info(disconnect_msg)
+        async with lock:
+            connected_clients.remove(connection)
+        logging.info("Client disconnected.")
