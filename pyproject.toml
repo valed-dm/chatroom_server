@@ -9,6 +9,9 @@ packages = [{include = "chatroom_server"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
+websockets = "^14.2"
+aiohttp = "^3.11.11"
+anyio = "^4.8.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -22,6 +25,19 @@ pytest = "^8.3.4"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.logging]
+level = "INFO"
+log_format = "%(asctime)s - %(name)s - %(levelname)s -  %(process)d - %(message)s"
+
+[tool.logging.console_handler]
+enabled = true
+level = "INFO"
+
+[tool.logging.file_handler]
+enabled = true
+filename = "websocket_server.log"
+level = "INFO"
 
 [tool.ruff.lint]
 select = [
