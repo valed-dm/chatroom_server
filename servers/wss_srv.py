@@ -21,7 +21,7 @@ async def wss_server(event: asyncio.Event):
             await event.wait()
         finally:
             logging.info("Shutting down WebSocket server...")
-            for client in connected_clients:
+            for client in list(connected_clients):
                 await client.close()
             wss_srv.close()
             await wss_srv.wait_closed()
