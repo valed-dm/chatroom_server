@@ -1,29 +1,30 @@
-# In-memory store for chatrooms
 import logging
 
 from aiohttp import web
+
+from utils.create_chatroom import CreateChatroom
 
 chatrooms = {}
 
 
 async def create_chatroom(request):
-    """HTTP handler for POST requests (create a chatroom)"""
+    """HTTP handler for POST requests to create a chatroom."""
     try:
-        data = await request.json()
-        room_id = data.get("roomId")
-        if not room_id or room_id in chatrooms:
+        # Ensure the request has the required authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
             return web.json_response(
-                {"error": "Invalid or duplicate roomId"},
-                status=400,
+                {"error": "Unauthorized. Missing or invalid token."},
+                status=401,
             )
 
-        chatrooms[room_id] = []  # Initialize room storage
-        create_msg = f"Chatroom created: {room_id}"
-        logging.info(create_msg)
-        return web.json_response(
-            {"message": f"Chatroom '{room_id}' created successfully."},
-        )
+        create_chatroom_handler = CreateChatroom(chatrooms, request)
+        return await create_chatroom_handler.handle_request()
+
     except Exception as e:
-        exc_msg = f"Error processing POST request: {e!s}"
-        logging.exception(exc_msg)
-        return web.json_response({"error": "Invalid request payload"}, status=400)
+        unexpected = f"Unexpected error: {e!s}"
+        logging.exception(unexpected)
+        return web.json_response(
+            {"error": "An internal server error occurred."},
+            status=500,
+        )
