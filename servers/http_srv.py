@@ -6,8 +6,8 @@ from aiohttp_swagger3 import SwaggerDocs
 from aiohttp_swagger3 import SwaggerInfo
 from aiohttp_swagger3 import SwaggerUiSettings
 
-from handlers.create_chatroom_handler import create_chatroom
-from handlers.list_chatrooms_handler import list_chatrooms
+from handlers.http_srv.create_chatroom_handler import create_chatroom
+from handlers.http_srv.list_chatrooms_handler import list_chatrooms
 
 
 async def http_server(event: anyio.Event):
