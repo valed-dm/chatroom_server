@@ -2,25 +2,24 @@ import logging
 
 from aiohttp import web
 
-from utils.create_chatroom import CreateChatroom
+from auth.mock_auth import MockAuth
+from handlers.http_srv.create_chatroom import CreateChatroom
+from handlers.wss_srv.chatrooms import Chatrooms
 
-chatrooms = {}
+auth = MockAuth()
+chatrooms = Chatrooms()
 
 
 async def create_chatroom(request):
     """HTTP handler for POST requests to create a chatroom."""
     try:
         # Ensure the request has the required authorization header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if not auth.is_authorized(request):
             return web.json_response(
-                {"error": "Unauthorized. Missing or invalid token."},
-                status=401,
+                {"error": "Unauthorized. Missing or invalid token."}, status=401,
             )
-
-        create_chatroom_handler = CreateChatroom(chatrooms, request)
-        return await create_chatroom_handler.handle_request()
-
+        chatroom = CreateChatroom(request)
+        return await chatroom.handle_request(chatrooms)
     except Exception as e:
         unexpected = f"Unexpected error: {e!s}"
         logging.exception(unexpected)
