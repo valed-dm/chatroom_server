@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import json
 import logging
 import ssl
 
@@ -14,14 +16,27 @@ async def wss_test():
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
 
+    created_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
+    test_message = {
+        "type": "message",
+        "userId": "tester_user_id",
+        "username": "Tester",
+        "content": "Hello, WSS Server!",
+        "timestamp": created_at,
+    }
+    headers = [("Authorization", "Bearer test_token")]  # ✅ Add authorization header
+
     try:
-        async with websockets.connect(uri, ssl=ssl_context) as websocket:
-            await websocket.send("Hello, WSS Server!")
+        async with websockets.connect(
+                uri,
+                ssl=ssl_context,
+                additional_headers=headers,
+        ) as websocket:
+            await websocket.send(json.dumps(test_message))
             response = await websocket.recv()
             logging.info(response)
-            await asyncio.sleep(.1)
     except Exception as e:
-        exc_msg = f"An error occurred: {e}"
+        exc_msg = f"An error occurred: {e!s}"
         logging.exception(exc_msg)
 
 
