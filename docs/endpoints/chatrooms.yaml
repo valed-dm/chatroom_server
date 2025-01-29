@@ -140,6 +140,40 @@ paths:
                     description: Error message.
       security:
         - bearerAuth: [ ]
+  /wss/chatrooms/{roomId}:
+    get:
+      summary: Get details about a specific chatroom.
+      operationId: getChatroom
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: The ID of the chatroom to retrieve.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chatroom details retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+                  max_users:
+                    type: integer
+                  current_users:
+                    type: integer
+        '404':
+          description: Chatroom not found.
 components:
   securitySchemes:
     bearerAuth:
