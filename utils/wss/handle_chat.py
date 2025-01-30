@@ -8,6 +8,7 @@ async def handle_chat_message(message, room_id, connection):
     user_id = message.get("userId")
     username = message.get("username")
     content = message.get("content")
+
     if not user_id or not username or not content:
         await connection.send(json.dumps(
             {"type": "system", "content": "Missing required fields in chat message."},
