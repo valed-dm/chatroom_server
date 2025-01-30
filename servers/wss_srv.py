@@ -1,9 +1,9 @@
 import asyncio
+import datetime
+import json
 import logging
 import ssl
 
-from websockets import ConnectionClosedError
-from websockets import ConnectionClosedOK
 from websockets import serve
 
 from handlers.wss_srv.clients import ConnectedClients
@@ -12,7 +12,10 @@ from handlers.wss_srv.wss_handler import handle_client
 connected_clients = ConnectedClients()
 
 
-async def wss_server(event: asyncio.Event):
+async def wss_server(
+        event: asyncio.Event,
+        shutdown_reason: str = "Server is shutting down.",
+):
     """WebSocket server with SSL"""
     # Create an SSL context
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -26,26 +29,28 @@ async def wss_server(event: asyncio.Event):
         finally:
             logging.info("Shutting down WebSocket server...")
             clients = await connected_clients.get_clients()
-            for client in clients:
-                try:
-                    # Attempt to close the connection
-                    await client.close()
-                except ConnectionClosedOK:  # noqa: PERF203
-                    closed_ok = "Client connection already closed (ConnectionClosedOK)."
-                    logging.info(closed_ok)
-                except ConnectionClosedError as e:
-                    closed_err = (f"Error while closing client connection "
-                                  f"(ConnectionClosedError): {e!s}")
-                    logging.warning(closed_err)
-                except asyncio.CancelledError:
-                    cancel_err = "Task was cancelled while closing a client connection."
-                    logging.warning(cancel_err)
-                except Exception as e:
-                    unexp = f"Unexpected error while closing client connection: {e!s}"
-                    logging.exception(unexp)
-                finally:
-                    # Ensure client is removed safely
-                    await connected_clients.remove_client(client)
+            disconnect_message = json.dumps({
+                "type": "disconnect",
+                "reason": shutdown_reason,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            })
+
+            await asyncio.gather(
+                *[
+                    client.send(disconnect_message)
+                    for client in clients if not client.close
+                ],
+                return_exceptions=True,
+            )
+
+            await asyncio.gather(
+                *[
+                    connected_clients.remove_client(client)
+                    for client in clients if not client.close
+                ],
+                return_exceptions=True,
+            )
+
             wss_srv.close()
             await wss_srv.wait_closed()
             logging.info("WebSocket server stopped cleanly.")
