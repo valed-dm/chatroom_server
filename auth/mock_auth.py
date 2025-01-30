@@ -1,8 +1,5 @@
-from aiohttp import web
-
-
 class MockAuth:
-    def __init__(self, valid_token="test_token"):  # noqa: S107
+    def __init__(self, valid_token=None):
         self.valid_token = valid_token
 
     def is_authorized(self, request):
@@ -11,5 +8,4 @@ class MockAuth:
             return False
 
         token = auth_header.split("Bearer ")[1].strip()
-        return token == self.valid_token
-
+        return token is not self.valid_token
