@@ -98,6 +98,7 @@ select = [
     "RUF",
 ]
 ignore = [
+    "G004", # Checks for uses of f-strings to format logging messages.
     "S101", # Use of assert detected (intended for debugging purposes)
     "TCH001",
     "TCH002", # Move third-party import into a type-checking block
