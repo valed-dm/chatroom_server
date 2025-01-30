@@ -12,8 +12,8 @@ from auth.mock_auth import MockAuth
 from handlers.wss_srv.chatrooms import Chatrooms
 from handlers.wss_srv.clients import ConnectedClients
 from utils.wss.handle_chat import handle_chat_message
-from utils.wss.handle_disconnect import handle_disconnect
-from utils.wss.handle_join import handle_join
+from utils.wss.handle_user_event import handle_disconnect
+from utils.wss.handle_user_event import handle_join
 from utils.wss.message_types import MessageType
 
 auth = MockAuth()
@@ -26,33 +26,31 @@ async def handle_client(connection: ServerConnection) -> Response | None:
     Handle WebSocket connections.
     :param connection: ServerConnection instance.
     """
+    client_ip = connection.remote_address[0]
     request = connection.request
     path = request.path
     request_path = f"Request path: {path}"
     logging.info(request_path)
 
     if not auth.is_authorized(request):
+        logging.warning(f"Unauthorized access attempt: {client_ip}")
         return web.json_response(
             {"error": "Unauthorized. Missing or invalid token."}, status=401,
         )
 
     try:
-        await connected_clients.add_client(connection)
-
         match = re.match(r"^/ws/chatrooms/(?P<roomId>[\w-]+)$", path)
         if match:
             room_id = match.group("roomId")
-            await chatrooms.add_member(room_id, connection)
-            joined = f"Client joined room: {room_id}"
-            logging.info(joined)
-            await connection.send(json.dumps(
-                {"type": "system", "content": f"Welcome to chatroom {room_id}!"},
-            ))
+            await connected_clients.add_client(connection)
         else:
             invalid_path = f"Invalid path: {path}"
             logging.warning(invalid_path)
             await connection.send(json.dumps(
-                {"type": "system", "content": "Invalid path. Disconnecting."},
+                {
+                    "type": "system",
+                    "content": f"Invalid path for ip: {client_ip}. Disconnecting.",
+                },
             ))
             return None
 
@@ -60,18 +58,19 @@ async def handle_client(connection: ServerConnection) -> Response | None:
             try:
                 message = json.loads(raw_message)
                 message_type = message.get("type")
-                msg_received = f"Received raw message: {message}"
-                logging.info(msg_received)
+                logging.info(f"Received raw message: {message}")
 
                 if message_type == MessageType.JOIN:
                     await handle_join(message, room_id, connection)
                 elif message_type == MessageType.MESSAGE:
                     await handle_chat_message(message, room_id, connection)
                 elif message_type == MessageType.DISCONNECT:
-                    await handle_disconnect(message, connection)
-                else:
+                    await handle_disconnect(message, room_id, connection)
+                elif message_type != MessageType.SYSTEM:
+                    msg = f"Unknown message type: {message_type}"
+                    logging.warning(msg)
                     await connection.send(json.dumps(
-                        {"type": "system", "content": "Unknown message type."},
+                        {"type": "system", "content": msg},
                     ))
             except json.JSONDecodeError:
                 logging.warning("Invalid JSON received.")
@@ -83,4 +82,4 @@ async def handle_client(connection: ServerConnection) -> Response | None:
                 logging.exception(msg_error)
     finally:
         await connected_clients.remove_client(connection)
-        logging.info("Client disconnected.")
+        logging.info(f"Client disconnected: {client_ip}")
