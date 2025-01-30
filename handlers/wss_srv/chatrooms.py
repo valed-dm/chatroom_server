@@ -1,5 +1,8 @@
 import asyncio
+import json
 import logging
+
+from utils.chat_user import ChatUser
 
 
 class Chatrooms:
@@ -93,11 +96,11 @@ class Chatrooms:
         """
         async with self._lock:
             if room_id in self._chatrooms:
-                members = self._chatrooms[room_id]["members"]
+                members = self._chatrooms[room_id]["current_users"]
                 for member in members:
+                    chat_user = ChatUser(member)
                     try:
-                        await member.send(message)
-                    except Exception as e:  # noqa: PERF203, BLE001
-                        # Handle any exceptions during message sending
-                        exc_msg = f"Failed to send message to a member: {e!s}"
-                        logging.warning(exc_msg)
+                        await member.send(json.dumps(message))
+                        logging.info(f"Message sent to {chat_user.token}")
+                    except Exception as e:  # noqa: BLE001
+                        logging.warning(f"Failed to send message to a member: {e!s}")
