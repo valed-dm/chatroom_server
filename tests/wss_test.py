@@ -18,13 +18,13 @@ async def wss_test():
 
     created_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
     test_message = {
-        "type": "message",
+        "type": "system",
         "userId": "tester_user_id",
         "username": "Tester",
         "content": "Hello, WSS Server!",
         "timestamp": created_at,
     }
-    headers = [("Authorization", "Bearer test_token")]  # ✅ Add authorization header
+    headers = [("Authorization", "Bearer wss_test")]
 
     try:
         async with websockets.connect(
@@ -33,11 +33,15 @@ async def wss_test():
                 additional_headers=headers,
         ) as websocket:
             await websocket.send(json.dumps(test_message))
-            response = await websocket.recv()
-            logging.info(response)
+
+            try:
+                response = await websocket.recv()
+                logging.info(f"Received: {response}")
+            except websockets.exceptions.ConnectionClosedOK:
+                logging.info("Test WebSocket connection closed normally.")
+
     except Exception as e:
-        exc_msg = f"An error occurred: {e!s}"
-        logging.exception(exc_msg)
+        logging.exception(f"An error occurred: {e!s}")  # noqa: TRY401
 
 
 if __name__ == "__main__":
