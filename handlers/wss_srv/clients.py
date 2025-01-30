@@ -1,9 +1,7 @@
 import asyncio
-import json
 import logging
 
-from websockets import ConnectionClosedError
-from websockets import ConnectionClosedOK
+from utils.chat_user import ChatUser
 
 
 class ConnectedClients:
@@ -22,28 +20,25 @@ class ConnectedClients:
 
     async def add_client(self, client):
         async with self._lock:
-            logging.info(f"Adding client {client}")
+            logging.info(
+                f"Adding client {await self.get_client_token(client)} "
+                f"to connected clients",
+            )
             self._clients.add(client)
 
     async def remove_client(self, client):
         async with self._lock:
+            logging.info(
+                f"Remove client {await self.get_client_token(client)} "
+                f"from connected clients",
+            )
             self._clients.discard(client)
+
+    @staticmethod
+    async def get_client_token(client):
+        client = ChatUser(client)
+        return client.token
 
     async def get_clients(self):
         async with self._lock:
             return self._clients.copy()
-
-    async def broadcast_to_room(self, room_id, message):
-        """
-        Broadcast a message to all clients in a specific room.
-        :param room_id: The ID of the room to broadcast to.
-        :param message: The message to broadcast (should be JSON serializable).
-        """
-        async with self._lock:
-            for client in self._clients:
-                # Ensure the client has room id
-                if getattr(client, "room_id", None) == room_id:
-                    try:
-                        await client.send(json.dumps(message))
-                    except (ConnectionClosedOK, ConnectionClosedError):
-                        logging.warning("Connection closed during broadcast.")
