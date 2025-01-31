@@ -28,10 +28,6 @@ class ConnectedClients:
 
     async def remove_client(self, client):
         async with self._lock:
-            logging.info(
-                f"Remove client {await self.get_client_token(client)} "
-                f"from connected clients",
-            )
             self._clients.discard(client)
 
     @staticmethod
