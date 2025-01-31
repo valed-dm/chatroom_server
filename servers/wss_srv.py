@@ -1,56 +1,44 @@
-import asyncio
-import datetime
-import json
 import logging
 import ssl
 
 from websockets import serve
 
 from handlers.wss_srv.clients import ConnectedClients
+from handlers.wss_srv.shutdown_signal import ShutdownSignalHandler
+from handlers.wss_srv.shutdown_websockets import shutdown_websockets
 from handlers.wss_srv.wss_handler import handle_client
 
 connected_clients = ConnectedClients()
 
 
-async def wss_server(
-        event: asyncio.Event,
-        shutdown_reason: str = "Server is shutting down.",
-):
-    """WebSocket server with SSL"""
+async def wss_server(signal_handler: ShutdownSignalHandler):
+    """WebSocket server with SSL."""
     # Create an SSL context
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_context.load_cert_chain(certfile="certificate.crt", keyfile="private.key")
+    try:
+        ssl_context.load_cert_chain(certfile="certificate.crt", keyfile="private.key")
+    except Exception as e:
+        logging.exception(f"Failed to load SSL certificate: {e}")  # noqa: TRY401
+        return
 
-    async with serve(handle_client, "localhost", 8765, ssl=ssl_context) as wss_srv:
-        logging.info("WebSocket server started on wss://localhost:8765")
+    try:
+        async with serve(handle_client, "localhost", 8765, ssl=ssl_context) as wss_srv:
+            logging.info("WebSocket server started on wss://localhost:8765")
 
-        try:
-            await event.wait()
-        finally:
-            logging.info("Shutting down WebSocket server...")
-            clients = await connected_clients.get_clients()
-            disconnect_message = json.dumps({
-                "type": "disconnect",
-                "reason": shutdown_reason,
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            })
+            try:
+                # Wait for shutdown signal
+                await signal_handler.stop_event.wait()
+                logging.info(f"WebSocket server shutting down: {signal_handler.reason}")
 
-            await asyncio.gather(
-                *[
-                    client.send(disconnect_message)
-                    for client in clients if not client.close
-                ],
-                return_exceptions=True,
-            )
+                # Gracefully disconnect all clients
+                clients = await connected_clients.get_clients()
+                await shutdown_websockets(clients, signal_handler.reason)
 
-            await asyncio.gather(
-                *[
-                    connected_clients.remove_client(client)
-                    for client in clients if not client.close
-                ],
-                return_exceptions=True,
-            )
+            finally:
+                # Close the WebSocket server
+                wss_srv.close()
+                await wss_srv.wait_closed()
+                logging.info("WebSocket server stopped cleanly.")
 
-            wss_srv.close()
-            await wss_srv.wait_closed()
-            logging.info("WebSocket server stopped cleanly.")
+    except Exception as e:
+        logging.exception(f"WebSocket server error: {e}")  # noqa: TRY401
