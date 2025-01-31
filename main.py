@@ -1,9 +1,7 @@
 import asyncio
 import logging
-import signal
 
-from anyio import Event
-
+from handlers.wss_srv.shutdown_signal import ShutdownSignalHandler
 from logging_config import setup_logging_from_pyproject
 from servers.http_srv import http_server
 from servers.wss_srv import wss_server
@@ -15,17 +13,14 @@ async def main():
     setup_logging_from_pyproject()
     logging.info("Starting Chatroom application...")
 
-    stop_event = Event()
+    signal_handler = ShutdownSignalHandler()
+    await signal_handler.register_signals()
 
-    async def shutdown():
-        logging.info("Shutdown signal received. Stopping servers...")
-        stop_event.set()
-
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
-
-    await asyncio.gather(http_server(stop_event), wss_server(stop_event), wss_test())
+    await asyncio.gather(
+        http_server(signal_handler),
+        wss_server(signal_handler),
+        wss_test(),
+    )
 
 
 if __name__ == "__main__":
