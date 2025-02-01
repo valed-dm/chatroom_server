@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import uuid
 
@@ -7,96 +8,105 @@ from aiohttp import web
 
 class CreateChatroom:
     def __init__(self, request):
-        """
-        Initialize CreateChatroom with an HTTP request.
-        :param request: The HTTP request object.
-        """
+        """Initialize CreateChatroom with an HTTP request."""
         self.request = request
 
     async def handle_request(self, chatrooms):
-        """
-        Handle the chatroom creation request.
-        :param chatrooms: An instance of the Chatrooms class.
-        :return: JSON response indicating success or failure.
-        """
+        """Handle the chatroom creation request."""
         data = await self._extract_payload()
-        if isinstance(data, web.Response):
-            return data  # Return early if payload extraction failed
+        if isinstance(data, web.Response):  # Return early if JSON extraction failed
+            return data
 
-        error_response = await self._validate_payload(data, chatrooms)
+        error_response, validated_data = await self._validate_payload(data, chatrooms)
         if error_response:
             return error_response
 
-        room_id, room_data = await self._create_chatroom(data)
+        room_id, room_data = await self._create_chatroom(validated_data)
         await chatrooms.add_chatroom(room_id, room_data)
-        return web.json_response({
-            "id": room_id,
-            "name": room_data["name"],
-            "description": room_data["description"],
-            "created_at": room_data["created_at"],
-            "max_users": room_data["max_users"],
-            "current_users": len(room_data["current_users"]),
-        },
+
+        return web.json_response(
+            {
+                "id": room_id,
+                **room_data,
+                "current_users": len(room_data["current_users"]),
+            },
             status=201,
         )
 
     async def _extract_payload(self):
-        """
-        Extract and parse the JSON payload from the request.
-        :return: Parsed JSON data or an error response.
-        """
+        """Extract and parse the JSON payload from the request."""
         try:
-            return await self.request.json()
-        except Exception as e:  # noqa: BLE001
+            data = await self.request.json()
+            logging.info(f"Extracted payload: {data}")
+        except json.JSONDecodeError as e:
+            logging.exception("Invalid JSON payload")
             return web.json_response(
-                {"error": f"Invalid JSON payload. {e!s}"}, status=400,
+                {"error": f"Invalid JSON payload. {e}"},
+                status=400,
             )
+        else:
+            return data
 
     @staticmethod
     async def _validate_payload(data, chatrooms):
-        """
-        Validate the JSON payload for required fields and constraints.
-        :param data: The JSON payload.
-        :param chatrooms: An instance of the Chatrooms class.
-        :return: An error response if validation fails, otherwise None.
-        """
-        name = data.get("name")
-        if not name:
+        """Validate the JSON payload for required fields and constraints."""
+        required_fields = {"name"}
+        if missing := required_fields - data.keys():
             return web.json_response(
-                {"error": "Missing required field: 'name'."}, status=400,
-            )
+                {"error": f"Missing fields: {', '.join(missing)}"},
+                status=400,
+            ), None
 
-        if name in (await chatrooms.get_chatrooms()).values():
+        name = data["name"]
+        if not isinstance(name, str):
             return web.json_response(
-                {"error": "Chatroom with the same name already exists."}, status=400,
-            )
+                {"error": "'name' must be a string."},
+                status=400,
+            ), None
 
-        max_users = data.get("max_users", 100)
-        if not isinstance(max_users, int) or max_users <= 0:
+        existing_rooms = await chatrooms.get_chatrooms()
+        if name in existing_rooms.values():
             return web.json_response(
-                {"error": "'max_users' must be a positive integer."}, status=400,
-            )
+                {"error": "Chatroom with the same name already exists."},
+                status=400,
+            ), None
 
-        return None  # Validation passed
+        # Optional field validation
+        description = data.get("description", "A fun place to chat.")
+        if not isinstance(description, str):
+            return web.json_response(
+                {"error": "'description' must be a string."},
+                status=400,
+            ), None
+
+        # Validate 'max_users'
+        try:
+            max_users = int(data.get("max_users", 100))
+            if max_users <= 0:
+                raise ValueError  # noqa: TRY301
+        except (ValueError, TypeError):
+            return web.json_response(
+                {"error": "'max_users' must be a positive integer."},
+                status=400,
+            ), None
+
+        return None, {
+            "name": name,
+            "description": description,
+            "max_users": max_users,
+        }
 
     @staticmethod
     async def _create_chatroom(data):
-        """
-        Create chatroom details based on the request data.
-        :param data: The JSON payload.
-        :return: A tuple containing room_id and room_data.
-        """
+        """Create chatroom details based on the validated data."""
         room_id = str(uuid.uuid4())
         created_at = datetime.datetime.now(datetime.UTC).isoformat()
 
         room_data = {
-            "name": data["name"],
-            "description": data.get("description", "A fun place to chat."),
+            **data,
             "created_at": created_at,
-            "max_users": data.get("max_users", 100),
             "current_users": set(),
         }
 
-        logging.info(f"Chatroom {room_data['name']} data prepared: ")
-
+        logging.info(f"Chatroom '{room_data['name']}' created: {room_data}")
         return room_id, room_data
