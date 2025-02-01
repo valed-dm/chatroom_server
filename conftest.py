@@ -3,7 +3,7 @@ import subprocess
 import time
 
 import pytest
-import requests
+from aiohttp import ClientSession
 
 WEBSOCKET_URL = "wss://localhost:8765/ws/chatrooms/"
 
@@ -38,12 +38,13 @@ def websocket_server_info():
     Fixture to pass information to the WebSocket server with a dynamic route suffix.
     """
 
-    def _send_info(room_id: str, info: dict):
+    async def _send_info(room_id: str, info: dict):
         # Construct the full URL with the room_id as a route suffix
         url = f"{WEBSOCKET_URL}{room_id}"
-        # Send the information to the server
-        response = requests.post(url, json=info)  # noqa: S113
-        response.raise_for_status()
-        return response.json()
+        # Send the information to the server asynchronously
+        async with ClientSession() as session:  # noqa: SIM117
+            async with session.post(url, json=info) as response:
+                response.raise_for_status()
+                return await response.json()
 
     return _send_info
