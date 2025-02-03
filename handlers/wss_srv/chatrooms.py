@@ -14,9 +14,19 @@ class Chatrooms:
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super().__new__(cls, *args, **kwargs)
-            cls._instance._chatrooms = {}  # Chatrooms dictionary  # noqa: SLF001
+            cls._instance._chatrooms = {}  # Chatrooms: {id: data}  # noqa: SLF001
+            cls._instance._name_to_id = {}  # Name-to-ID: {name: id}  # noqa: SLF001
             cls._instance._lock = asyncio.Lock()  # noqa: SLF001
         return cls._instance
+
+    async def chatroom_exists_by_name(self, room_data: dict) -> bool:
+        """Check if a chat room exists."""
+        target_name = room_data.get("name")
+        if not target_name:
+            return False  # No name provided in room_data
+
+        async with self._lock:  # Ensure thread-safe access to _name_to_id
+            return target_name in self._name_to_id
 
     async def add_chatroom(self, room_id: str, room_data: dict):
         """
@@ -25,8 +35,10 @@ class Chatrooms:
         :param room_data: Dictionary containing chatroom details.
         """
         async with self._lock:
+            target_name = room_data.get("name")
             logging.info(f"Adding chatroom {room_id} with data: {room_data}")
             self._chatrooms[room_id] = room_data
+            self._name_to_id[target_name] = room_id
 
     async def remove_chatroom(self, room_id: str):
         """
@@ -34,7 +46,9 @@ class Chatrooms:
         :param room_id: Unique ID of the chatroom to remove.
         """
         async with self._lock:
+            name = self._chatrooms[room_id].get("name")
             self._chatrooms.pop(room_id, None)
+            self._name_to_id.pop(name, None)
 
     async def get_chatrooms(self) -> dict[str, dict]:
         """
