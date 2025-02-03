@@ -20,11 +20,10 @@ class ConnectedClients:
 
     async def add_client(self, client):
         async with self._lock:
-            logging.info(
-                f"Adding client {await self.get_client_token(client)} "
-                f"to connected clients",
-            )
+            token = await self.get_client_token(client)
+            logging.info(f"Adding client {token} to connected clients")
             self._clients.add(client)
+            return True  # ✅ Confirm client was added
 
     async def remove_client(self, client):
         async with self._lock:
