@@ -5,7 +5,6 @@ from handlers.wss_srv.shutdown_signal import ShutdownSignalHandler
 from logging_config import setup_logging_from_pyproject
 from servers.http_srv import http_server
 from servers.wss_srv import wss_server
-from tests.wss_conn_probe import wss_test
 
 
 async def main():
@@ -19,7 +18,6 @@ async def main():
     await asyncio.gather(
         http_server(signal_handler),
         wss_server(signal_handler),
-        wss_test(),
     )
 
 
