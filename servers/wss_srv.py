@@ -18,27 +18,27 @@ async def wss_server(signal_handler: ShutdownSignalHandler):
     try:
         ssl_context.load_cert_chain(certfile="certificate.crt", keyfile="private.key")
     except Exception as e:
-        logging.exception(f"Failed to load SSL certificate: {e}")  # noqa: TRY401
+        logging.exception(f"Failed to load SSL certificate: {e!s}")  # noqa: TRY401
         return
 
     try:
-        async with serve(handle_client, "localhost", 8765, ssl=ssl_context) as wss_srv:
-            logging.info("WebSocket server started on wss://localhost:8765")
+        async with serve(
+                handle_client, "localhost", 8765, ssl=ssl_context,
+                backlog=500,
+                max_size=10 ** 6,  # Allow messages up to 1MB
+                ping_interval=20,  # Prevent disconnects on slow clients
+        ) as _wss_srv:
+            logging.info("✅ WebSocket server started on wss://localhost:8765")
 
-            try:
-                # Wait for shutdown signal
-                await signal_handler.stop_event.wait()
-                logging.info(f"WebSocket server shutting down: {signal_handler.reason}")
+            await signal_handler.stop_event.wait()
+            logging.info(f"⚠️ WebSocket server shutting down: {signal_handler.reason}")
 
-                # Gracefully disconnect all clients
-                clients = await connected_clients.get_clients()
-                await shutdown_websockets(clients, signal_handler.reason)
-
-            finally:
-                # Close the WebSocket server
-                wss_srv.close()
-                await wss_srv.wait_closed()
-                logging.info("WebSocket server stopped cleanly.")
+            # Gracefully disconnect all clients
+            clients = await connected_clients.get_clients()
+            await shutdown_websockets(clients, signal_handler.reason)
 
     except Exception as e:
-        logging.exception(f"WebSocket server error: {e}")  # noqa: TRY401
+        logging.exception(f"🔥 WebSocket server error: {e}")  # noqa: TRY401
+
+    finally:
+        logging.info("✅ WebSocket server stopped cleanly.")
