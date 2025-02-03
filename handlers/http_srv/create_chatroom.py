@@ -5,6 +5,8 @@ import uuid
 
 from aiohttp import web
 
+from utils.http_status import HTTPStatus
+
 
 class CreateChatroom:
     def __init__(self, request):
@@ -21,17 +23,25 @@ class CreateChatroom:
         if error_response:
             return error_response
 
-        room_id, room_data = await self._create_chatroom(validated_data)
-        await chatrooms.add_chatroom(room_id, room_data)
+        if validated_data:
+            room_id, room_data = await self._create_chatroom(validated_data)
+            room_exists = await chatrooms.chatroom_exists_by_name(room_data)
+            if room_exists:
+                return web.json_response(
+                    data={"error": "Chatroom with the same name already exists."},
+                    status=HTTPStatus.CONFLICT.value,
+                )
+            await chatrooms.add_chatroom(room_id, room_data)
 
-        return web.json_response(
-            {
-                "id": room_id,
-                **room_data,
-                "current_users": len(room_data["current_users"]),
-            },
-            status=201,
-        )
+            return web.json_response(
+                {
+                    "id": room_id,
+                    **room_data,
+                    "current_users": len(room_data["current_users"]),
+                },
+                status=HTTPStatus.CREATED.value,
+            )
+        return error_response
 
     async def _extract_payload(self):
         """Extract and parse the JSON payload from the request."""
@@ -42,7 +52,7 @@ class CreateChatroom:
             logging.exception("Invalid JSON payload")
             return web.json_response(
                 {"error": f"Invalid JSON payload. {e}"},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             )
         else:
             return data
@@ -54,21 +64,21 @@ class CreateChatroom:
         if missing := required_fields - data.keys():
             return web.json_response(
                 {"error": f"Missing fields: {', '.join(missing)}"},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             ), None
 
         name = data["name"]
         if not isinstance(name, str):
             return web.json_response(
                 {"error": "'name' must be a string."},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             ), None
 
         existing_rooms = await chatrooms.get_chatrooms()
         if name in existing_rooms.values():
             return web.json_response(
                 {"error": "Chatroom with the same name already exists."},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             ), None
 
         # Optional field validation
@@ -76,7 +86,7 @@ class CreateChatroom:
         if not isinstance(description, str):
             return web.json_response(
                 {"error": "'description' must be a string."},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             ), None
 
         # Validate 'max_users'
@@ -87,7 +97,7 @@ class CreateChatroom:
         except (ValueError, TypeError):
             return web.json_response(
                 {"error": "'max_users' must be a positive integer."},
-                status=400,
+                status=HTTPStatus.BAD_REQUEST.value,
             ), None
 
         return None, {
