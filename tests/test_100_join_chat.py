@@ -77,5 +77,5 @@ async def test_100_users_join_chat(ssl_context):
 
         assert data["type"] in ["message", "system"], f"Unexpected response: {data}"
         join_info = f"Пользователь User_{user_id} присоединился к чату."
-        join_failure = f"Join message failed for user {user_id}: {data}"
+        join_failure = f"Join message failed for User_{user_id}: {data}"
         assert join_info in data["content"], join_failure
