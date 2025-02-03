@@ -3,10 +3,10 @@ import ssl
 
 from websockets import serve
 
+from handlers.wss_srv.client.handle_client import handle_client
 from handlers.wss_srv.clients import ConnectedClients
 from handlers.wss_srv.shutdown_signal import ShutdownSignalHandler
 from handlers.wss_srv.shutdown_websockets import shutdown_websockets
-from handlers.wss_srv.wss_handler import handle_client
 
 connected_clients = ConnectedClients()
 
@@ -24,7 +24,7 @@ async def wss_server(signal_handler: ShutdownSignalHandler):
     try:
         async with serve(
                 handle_client, "localhost", 8765, ssl=ssl_context,
-                backlog=500,
+                backlog=1000,
                 max_size=10 ** 6,  # Allow messages up to 1MB
                 ping_interval=20,  # Prevent disconnects on slow clients
         ) as _wss_srv:
