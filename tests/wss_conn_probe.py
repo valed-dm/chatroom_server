@@ -6,6 +6,8 @@ import ssl
 
 import websockets
 
+VALID_TOKEN = "valid_token"  # noqa: S105
+
 
 async def wss_test():
     """Test wss server"""
@@ -17,6 +19,10 @@ async def wss_test():
     ssl_context.verify_mode = ssl.CERT_NONE
 
     created_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {VALID_TOKEN}",
+    }
     test_message = {
         "type": "system",
         "userId": "tester_user_id",
@@ -24,13 +30,12 @@ async def wss_test():
         "content": "Hello, WSS Server!",
         "timestamp": created_at,
     }
-    headers = [("Authorization", "Bearer wss_test")]
 
     try:
         async with websockets.connect(
                 uri,
-                ssl=ssl_context,
                 additional_headers=headers,
+                ssl=ssl_context,
         ) as websocket:
             await websocket.send(json.dumps(test_message))
 
