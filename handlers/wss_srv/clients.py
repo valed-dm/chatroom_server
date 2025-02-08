@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import json
 import logging
 
 from utils.chat_user import ChatUser
@@ -20,14 +22,24 @@ class ConnectedClients:
 
     async def add_client(self, client):
         async with self._lock:
+            client_ip = client.remote_address[0]
             token = await self.get_client_token(client)
-            logging.info(f"Adding client {token} to connected clients")
+            timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+            logging.info(f"Adding client {token}:{client_ip} to connected clients")
             self._clients.add(client)
-            return True  # ✅ Confirm client was added
+            system_message = {
+                "type": "system",
+                "content": f"Client {token}:{client_ip} added to connected clients",
+                "timestamp": timestamp,
+            }
+            await client.send(json.dumps(system_message))
+            return True, token  # ✅ Confirm client was added
 
     async def remove_client(self, client):
+        token = await self.get_client_token(client)
         async with self._lock:
             self._clients.discard(client)
+            return token
 
     @staticmethod
     async def get_client_token(client):
