@@ -1,0 +1,25 @@
+config:
+  target: "http://localhost:9090/chatrooms"
+  phases:
+    - duration: 120
+      arrivalRate: 100
+      rampTo: 50000
+  plugins:
+    ws:
+      # Install the plugin using: npm install artillery-plugin-ws
+      use: artillery-plugin-ws
+  ws:
+    baseUrl: "wss://localhost:8765/ws/chatrooms"
+  processor: "./processor.js"  # Path to the processor file for custom logic
+
+scenarios:
+  - name: "Join rooms and send messages"
+    engine: "ws"
+    flow:
+      - function: "setup"
+      - loop:
+          - function: "joinRoomAndSendMessages"
+          - think: 1  # Simulate user think time
+        count: "{{ $loopCount }}"
+
+# Custom JavaScript logic in processor.js
