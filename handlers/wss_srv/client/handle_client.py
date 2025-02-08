@@ -17,8 +17,8 @@ from handlers.wss_srv.client.process_message import process_message
 from handlers.wss_srv.clients import ConnectedClients
 from utils.http_status import HTTPStatus
 
-MESSAGE_RATE_LIMIT = 150  # Max 150 messages per 15 seconds
-MESSAGE_RATE_WINDOW = 15  # Time window in seconds
+MESSAGE_RATE_LIMIT = 5000  # Max 5000 messages per .5 second
+MESSAGE_RATE_WINDOW = .5  # Time window in seconds
 
 auth = MockAuth()
 chatrooms = Chatrooms()
@@ -31,6 +31,7 @@ async def handle_client(connection: ServerConnection) -> Response | None:
     Handle WebSocket connections.
     :param connection: ServerConnection instance.
     """
+    client_token = ""
     client_ip = connection.remote_address[0]
     request = connection.request
     path = request.path
@@ -49,14 +50,16 @@ async def handle_client(connection: ServerConnection) -> Response | None:
         logging.warning(f"Invalid path: {path}")
         await connection.send(json.dumps({
             "type": "system",
-            "content": f"Invalid path for ip: {client_ip}. Disconnecting.",
+            "content": f"Invalid path for {client_token}:{client_ip}. Disconnecting.",
         }))
         return None
 
     room_id = match.group("roomId")
-    added = await connected_clients.add_client(connection)
+    added, client_token = await connected_clients.add_client(connection)
     if not added:
-        logging.error(f"Failed to add client {client_ip} to connected clients")
+        logging.error(
+            f"Failed to add client {client_token}:{client_ip} to connected clients",
+        )
         return None
 
     invalid_message_count = 0
@@ -68,7 +71,7 @@ async def handle_client(connection: ServerConnection) -> Response | None:
                 message_times.popleft()
 
             if len(message_times) > MESSAGE_RATE_LIMIT:
-                await handle_message_rate_limit(connection, client_ip)
+                await handle_message_rate_limit(connection, client_token, client_ip)
                 return None
 
             invalid_message_count = await process_message(
@@ -79,5 +82,5 @@ async def handle_client(connection: ServerConnection) -> Response | None:
                 client_ip,
             )
     finally:
-        await connected_clients.remove_client(connection)
-        logging.info(f"Client disconnected: {client_ip}")
+        client_token = await connected_clients.remove_client(connection)
+        logging.info(f"Client disconnected: {client_token}:{client_ip}")
